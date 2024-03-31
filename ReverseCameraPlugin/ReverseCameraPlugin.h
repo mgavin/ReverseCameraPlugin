@@ -1,4 +1,6 @@
 #pragma once
+#include <Windows.h>
+#include <Xinput.h>
 #include <string>
 #include "bakkesmod/imgui/imgui.h"
 #include "bakkesmod/plugin/bakkesmodplugin.h"
@@ -10,40 +12,25 @@ class ReverseCameraPlugin :
 private:
         ServerWrapper GetCurrentGameState() const;
 
-        Vector project_v1_on_v2(Vector vec1, Vector vec2);
-        Quat AngleAxisRotation(float angle, Vector axis);
-        Quat GetQuatFromMatrix(Vector fwd, Vector right, Vector up);
-        Quat rotToQuat(Rotator rot);
+        int   right_stick_fnameindex;
+        bool  in_reverse_cam;
+        bool  camcontrol_loaded;
+        float rstickx, rsticky;
+        int   prev_pitch;
+        bool  captured_pitch;
+        bool  enabled;
 
-        bool isInRearCam;
-        bool isInBallCam;
-        Vector FOCUS;
-        Rotator ROTATION, SWIVEL;
-        float DISTANCE, FOV;
-        bool camcontrol_loaded;
-        bool wasSupersonic = false;
-        float interpStepsIntoSupersonic = 0;
-        float interpStepsOutOfSupersonic = 0;
-
-        bool cvars_nulled_out;
+        XINPUT_STATE xboxControllerState;
 
 public:
         void onLoad() override;
         void onUnload() override;
 
-        void RenderSettings() override;
+        void        RenderSettings() override;
         std::string GetPluginName() override;
-        void SetImGuiContext(uintptr_t ctx) override;
+        void        SetImGuiContext(uintptr_t ctx) override;
 
-        bool CheckCameraControlLoaded();
+        void HandleValues() const;
 
-        // These functions are mostly copied from the "camera control template",
-        // just to make things easier to copy
-        bool CanCreateValues() const;
-        bool IsCVarNull(std::string cvarName) const;
-        void ResetCameraCVars();
-
-        void HandleValues();
-
-        bool enabled;
+        void onTick(std::string);
 };
