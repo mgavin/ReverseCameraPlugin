@@ -12,7 +12,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.0.0",
+                 "2.0.2",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -54,6 +54,7 @@ void ReverseCameraPlugin::onLoad() {
                         }
                 });
 
+        /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT KEYBINDS? */
         right_stick_fnameindex =
                 gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
 }
@@ -80,17 +81,23 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                         const bool stick_is_pressed = gameWrapper->IsKeyPressed(
                                 right_stick_fnameindex);
 
-                        if (stick_is_pressed) {
+                        if (stick_is_pressed && !already_pressed) {
                                 in_reverse_cam = true;
                                 cam.SetSwivelDieRate(0.0f);
                                 if (!captured_pitch) {
                                         prev_pitch = cam.GetRotation().Pitch;
                                         captured_pitch = true;
                                 }
-                        } else {
-                                in_reverse_cam = false;
+                                already_pressed = true;
+                        } else if (!stick_is_pressed && already_pressed) {
+                                Rotator rot =
+                                        cam.GetDesiredSwivel(rsticky, rstickx);
+                                cam.SetCurrentSwivel(rot);
+                                cam.UpdateSwivel(0.0f);
                                 cam.SetSwivelDieRate(2.0f);
-                                captured_pitch = false;
+                                in_reverse_cam  = false;
+                                captured_pitch  = false;
+                                already_pressed = false;
                         }
                         const int PLAYER_NUMBER = 0;
                         std::memset(

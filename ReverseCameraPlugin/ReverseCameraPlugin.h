@@ -14,10 +14,10 @@ private:
 
         int   right_stick_fnameindex;
         bool  in_reverse_cam;
-        bool  camcontrol_loaded;
         float rstickx, rsticky;
         int   prev_pitch;
-        bool  captured_pitch;
+        bool  captured_pitch  = false;
+        bool  already_pressed = false;
         bool  enabled;
 
         XINPUT_STATE xboxControllerState;
