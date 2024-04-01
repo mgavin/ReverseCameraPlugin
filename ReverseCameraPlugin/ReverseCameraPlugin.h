@@ -14,6 +14,7 @@ private:
 
         int   right_stick_fnameindex = 0;
         bool  in_reverse_cam         = false;
+        bool  invert_swivel          = false;
         float rstickx = 0.0f, rsticky = 0.0f;
         bool  already_pressed = false;
         bool  enabled         = true;

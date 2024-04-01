@@ -11,7 +11,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.0.35",
+                 "2.1.35",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -45,6 +45,16 @@ void ReverseCameraPlugin::onLoad() {
                                         std::bind(&ReverseCameraPlugin::
                                                           HandleValues,
                                                   this));
+                                HookedEvents::AddHookedEvent(
+                                        "Function TAGame.GFxData_Settings_TA.SetInvertSwivelPitch",
+                                        [this](std::string eventName) {
+                                                // set = 0 in the settings
+                                                invert_swivel = !(
+                                                        gameWrapper
+                                                                ->GetSettings()
+                                                                .GetCameraSaveSettings()
+                                                                .InvertSwivelPitch);
+                                        });
                         } else {
                                 HookedEvents::RemoveHook(
                                         "Function Engine.GameViewportClient.Tick");
@@ -56,6 +66,12 @@ void ReverseCameraPlugin::onLoad() {
         /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT KEYBINDS? */
         right_stick_fnameindex =
                 gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
+
+        // unset = 1 in the settings, like, "inverting swivel" is default, so 1
+        // means do opposite / unswivel / negate the swivel.
+        invert_swivel = !(gameWrapper->GetSettings()
+                                  .GetCameraSaveSettings()
+                                  .InvertSwivelPitch);
 }
 
 void ReverseCameraPlugin::onUnload() {
@@ -79,7 +95,6 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                         //  if so = RearCam, otherwise Cleanup
                         const bool stick_is_pressed = gameWrapper->IsKeyPressed(
                                 right_stick_fnameindex);
-
                         if (stick_is_pressed && !already_pressed) {
                                 in_reverse_cam = true;
                                 cam.SetSwivelDieRate(0.0f);
@@ -115,8 +130,8 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                                           SHRT_MAX;
                         }
                 } else {
-                        // it's not a gamepad... it might be a keyboard and
-                        // mouse
+                        // it's not a gamepad... it might be a keyboard
+                        // and mouse
                 }
         }
 }
@@ -130,15 +145,17 @@ void ReverseCameraPlugin::HandleValues() const {
 
         /*
         if you wish to account for camera angle,
-        you should get the CameraSettings and add Angle*180 to the pitch to
-        "zero" it out, or 2*Angle*180, to go in the opposite direction
+        you should get the CameraSettings and add Angle*180 to the pitch
+        to "zero" it out, or 2*Angle*180, to go in the opposite
+        direction
 
         ADD it, due to how the camera rotates around the
         location. Adding to pitch moves it forward around the circle (or
         sphere).
         */
         if (enabled && in_reverse_cam) {
-                Rotator rot  = cam.GetDesiredSwivel(rsticky, rstickx);
+                Rotator rot = cam.GetDesiredSwivel(
+                        ((invert_swivel) ? -1 : 1) * rsticky, rstickx);
                 Rotator rtot = rot + Rotator{32767, 0, 32767};
                 cam.SetCurrentSwivel(rtot);
                 cam.UpdateSwivel(0);
