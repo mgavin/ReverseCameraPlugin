@@ -12,7 +12,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.0.2",
+                 "2.0.7",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -57,6 +57,40 @@ void ReverseCameraPlugin::onLoad() {
         /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT KEYBINDS? */
         right_stick_fnameindex =
                 gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
+
+        cvarManager->registerNotifier(
+                "rvcam_FUCK",
+                [this](std::vector<std::string> args) {
+                        float         neat = 0.0f;
+                        CameraWrapper cam  = gameWrapper->GetCamera();
+                        Rotator       tmpr;
+                        for (int i = 0; i <= 20; ++i) {
+                                tmpr = cam.GetDesiredSwivel(neat, neat);
+                                LOG("cam GetDesiredSwivel({0:0.3f}, {0:0.3f}) = {{Pitch: {1:}, Yaw: {2:}}}",
+                                    neat,
+                                    tmpr.Pitch,
+                                    tmpr.Yaw);
+                                neat += 0.1f;
+                        }
+
+                        // calclulated best fit for YAW since "32767 is reliably
+                        // REVERSED PITCH doesn't conform to the same formula
+                        // for YAW, but it follows at a slower RATE THIS IS THE
+                        // CALCULATED RATE FOR YAW, SO it should be "REVERSE "
+                        // for pitch
+                        const float MAGIC_NUMBER = 1.4563758;
+                        tmpr = cam.GetDesiredSwivel(MAGIC_NUMBER, MAGIC_NUMBER);
+                        LOG("cam GetDesiredSwivel({0:0.3f}, {0:0.3f}) = {{Pitch: {1:}, Yaw: {2:}}}",
+                            MAGIC_NUMBER,
+                            tmpr.Pitch,
+                            tmpr.Yaw);
+                        // THIS OUTPUTS
+                        // cam GetDesiredSwivel(1.456, 1.456)
+                        //                          = {Pitch: 8010, Yaw: 32767}
+                        //  BEAUTIFUL
+                },
+                "desired deltas",
+                NULL);
 }
 
 void ReverseCameraPlugin::onUnload() {
@@ -68,26 +102,34 @@ void ReverseCameraPlugin::onUnload() {
  *
  * TODO: ADD HANDLING FOR DIFFERENT KEYBINDS
  *
+ * THERES A BUG WITH THE X-AXIS! FUCK!
  *
  */
 void ReverseCameraPlugin::onTick(std::string eventName) {
         PlayerControllerWrapper pcw = gameWrapper->GetPlayerController();
         CameraWrapper           cam = gameWrapper->GetCamera();
         ServerWrapper           sw  = GetCurrentGameState();
+
+        // if (gameWrapper->IsInReplay()) {
+        //         sw = gameWrapper->GetGameEventAsReplay().memory_address;
+        // } else if (gameWrapper->IsInOnlineGame()) {
+        //         sw = gameWrapper->GetOnlineGame();
+        // } else {
+        //         sw = gameWrapper->GetGameEventAsServer();
+        // }
+
         if (!pcw.IsNull() && !cam.IsNull() && !sw.IsNull()) {
                 if (pcw.GetbUsingGamepad()) {
                         // is right stick pressed? if so = RearCam, otherwise
                         // Cleanup
+                        is_on_wall = gameWrapper->GetLocalCar().IsOnWall();
+
                         const bool stick_is_pressed = gameWrapper->IsKeyPressed(
                                 right_stick_fnameindex);
 
                         if (stick_is_pressed && !already_pressed) {
                                 in_reverse_cam = true;
                                 cam.SetSwivelDieRate(0.0f);
-                                if (!captured_pitch) {
-                                        prev_pitch = cam.GetRotation().Pitch;
-                                        captured_pitch = true;
-                                }
                                 already_pressed = true;
                         } else if (!stick_is_pressed && already_pressed) {
                                 Rotator rot =
@@ -96,7 +138,6 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                                 cam.UpdateSwivel(0.0f);
                                 cam.SetSwivelDieRate(2.0f);
                                 in_reverse_cam  = false;
-                                captured_pitch  = false;
                                 already_pressed = false;
                         }
                         const int PLAYER_NUMBER = 0;
@@ -135,14 +176,26 @@ void ReverseCameraPlugin::HandleValues() const {
         }
 
         if (enabled && in_reverse_cam) {
+                // cvarManager->executeCommand(
+                //         "bm_playground_camera_print_getters", false);
                 Rotator rot = cam.GetDesiredSwivel(rsticky, rstickx);
-                cam.SetCurrentSwivel(rot +
-                                     Rotator{-1 * prev_pitch * 2, 32767, 0});
+                cam.SetCurrentSwivel(
+                        rot +
+                        Rotator{(is_on_wall) ? REVERSE_ROT_DELTA.Pitch : 0,
+                                REVERSE_ROT_DELTA.Yaw,
+                                0});
                 cam.UpdateSwivel(0);
         }
 }
 
-ServerWrapper ReverseCameraPlugin::GetCurrentGameState() const {
+// declared inline because
+// https://stackoverflow.com/questions/46163607/avoid-memory-allocation-with-stdfunction-and-member-function
+// led me to believe crashing with allocation errors was because of
+// ServerWrapper's instantiation with the memory_address so if it
+// happens inline instead, in the anonymous function / bound member
+// function, instead of being dynamically allocated and returned, it
+// would be in the function... something like that
+inline ServerWrapper ReverseCameraPlugin::GetCurrentGameState() const {
         if (gameWrapper->IsInReplay())
                 return gameWrapper->GetGameEventAsReplay().memory_address;
         else if (gameWrapper->IsInOnlineGame())
