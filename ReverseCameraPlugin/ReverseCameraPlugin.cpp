@@ -5,7 +5,6 @@
 #include <format>
 #include "bakkesmod/wrappers/GameWrapper.h"
 #include "bakkesmod/wrappers/gfx/GfxDataTrainingWrapper.h"
-#include "HelperFunctions.h"
 #include "HookedEvents.h"
 
 std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
@@ -46,23 +45,31 @@ void ReverseCameraPlugin::onLoad() {
                                         std::bind(&ReverseCameraPlugin::
                                                           HandleValues,
                                                   this));
+                                HookedEvents::AddHookedEvent(
+                                        "Function TAGame.CameraState_BallCam_TA.BeginCameraState",
+                                        [&](std::string eventName) {
+                                                in_ball_cam = true;
+                                        });
+                                HookedEvents::AddHookedEvent(
+                                        "Function TAGame.CameraState_BallCam_TA.EndCameraState",
+                                        [&](std::string eventName) {
+                                                in_ball_cam = false;
+                                        });
                         } else {
                                 HookedEvents::RemoveHook(
                                         "Function Engine.GameViewportClient.Tick");
                                 HookedEvents::RemoveHook(
                                         "Function ProjectX.Camera_X.ClampPOV");
+                                HookedEvents::RemoveHook(
+                                        "Function TAGame.CameraState_BallCam_TA.BeginCameraState");
+                                HookedEvents::RemoveHook(
+                                        "Function TAGame.CameraState_BallCam_TA.EndCameraState");
                         }
                 });
 
         /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT KEYBINDS? */
         right_stick_fnameindex =
                 gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
-
-        for (int i = 0; i < 16384; ++i) {
-                LOG("fucking fuck it: i: {}, i + 20000 = {}",
-                    i,
-                    fucking_fuckit(20000 + i));
-        }
 }
 
 void ReverseCameraPlugin::onUnload() {
@@ -81,14 +88,6 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
         PlayerControllerWrapper pcw = gameWrapper->GetPlayerController();
         CameraWrapper           cam = gameWrapper->GetCamera();
         ServerWrapper           sw  = GetCurrentGameState();
-
-        // if (gameWrapper->IsInReplay()) {
-        //         sw = gameWrapper->GetGameEventAsReplay().memory_address;
-        // } else if (gameWrapper->IsInOnlineGame()) {
-        //         sw = gameWrapper->GetOnlineGame();
-        // } else {
-        //         sw = gameWrapper->GetGameEventAsServer();
-        // }
 
         if (!pcw.IsNull() && !cam.IsNull() && !sw.IsNull()) {
                 if (pcw.GetbUsingGamepad()) {
@@ -197,30 +196,40 @@ void ReverseCameraPlugin::HandleValues() const {
                  *
                  *
                  */
-                Rotator rot = cam.GetDesiredSwivel(rsticky, rstickx);
-                Rotator reverse_rot1 =
-                        cam.GetDesiredSwivel(CALCULATED_REVERSE_FACTOR * 1.0f,
-                                             CALCULATED_REVERSE_FACTOR * 1.0f);
-                Rotator reverse_rot2 =
-                        cam.GetDesiredSwivel(CALCULATED_REVERSE_FACTOR * -1.0f,
-                                             CALCULATED_REVERSE_FACTOR * -1.0f);
-                LOG("reverse_rot1: {{Pitch: {}, YAW: {}, Roll: {}}}",
-                    reverse_rot1.Pitch,
-                    reverse_rot1.Yaw,
-                    reverse_rot1.Roll);
-                LOG("reverse_rot2: {{Pitch: {}, YAW: {}, Roll: {}}}",
-                    reverse_rot2.Pitch,
-                    reverse_rot2.Yaw,
-                    reverse_rot2.Roll);
+                /*
+Rotator rot = cam.GetDesiredSwivel(rsticky, rstickx);
+Rotator reverse_rot1 =
+cam.GetDesiredSwivel(CALCULATED_REVERSE_FACTOR * 1.0f,
+                     CALCULATED_REVERSE_FACTOR * 1.0f);
+Rotator reverse_rot2 =
+cam.GetDesiredSwivel(CALCULATED_REVERSE_FACTOR * -1.0f,
+                     CALCULATED_REVERSE_FACTOR * -1.0f);
+LOG("reverse_rot1: {{Pitch: {}, YAW: {}, Roll: {}}}",
+reverse_rot1.Pitch,
+reverse_rot1.Yaw,
+reverse_rot1.Roll);
+LOG("reverse_rot2: {{Pitch: {}, YAW: {}, Roll: {}}}",
+reverse_rot2.Pitch,
+reverse_rot2.Yaw,
+reverse_rot2.Roll);
 
-                Rotator rtot =
-                        rot +
-                        Rotator{(is_on_wall) ? reverse_rot1.Pitch + 32767 : 0,
-                                reverse_rot1.Yaw,
-                                0};
-                LOG("rotot pitch: {}", rtot.Pitch);
-                // rtot.Pitch = fucking_fuckit(rtot.Pitch);
-                LOG("rotot pitch: {}", rtot.Pitch);
+Rotator rtot =
+rot + Rotator{(is_on_wall) ? 32767 : 0, 32767, 0};
+LOG("rotot pitch: {}", rtot.Pitch);
+
+// the following shows a lack of fundamental understanding of
+// what the fuck is going on with the camera... because is it
+// actually the case that ball cam != regular cam??????? which
+// may actually BE the case but why would constricting it NOW.
+// MATTER this much to this extent.
+//                if (in_ball_cam) {
+// constrict the computed value...
+rtot.Pitch = fucking_fuckit(rtot.Pitch);
+//              }
+LOG("rotot pitch: {}", rtot.Pitch);
+                                        */
+                Rotator rot  = cam.GetDesiredSwivel(rsticky, rstickx);
+                Rotator rtot = rot + Rotator{32767, 0, 32767};
                 cam.SetCurrentSwivel(rtot);
                 cam.UpdateSwivel(0);
         }
@@ -235,6 +244,8 @@ void ReverseCameraPlugin::HandleValues() const {
 // would be in the function... something like that
 
 // which may or may not be the case because of fucking variables and stuff.
+// (I got paranoid because gw->LocalCar() may have been null at one point.
+// I'm not even entirely exactly sure what `inline` does.
 inline ServerWrapper ReverseCameraPlugin::GetCurrentGameState() const {
         if (gameWrapper->IsInReplay())
                 return gameWrapper->GetGameEventAsReplay().memory_address;
