@@ -11,7 +11,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.0.7",
+                 "2.0.35",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -45,25 +45,11 @@ void ReverseCameraPlugin::onLoad() {
                                         std::bind(&ReverseCameraPlugin::
                                                           HandleValues,
                                                   this));
-                                HookedEvents::AddHookedEvent(
-                                        "Function TAGame.CameraState_BallCam_TA.BeginCameraState",
-                                        [&](std::string eventName) {
-                                                in_ball_cam = true;
-                                        });
-                                HookedEvents::AddHookedEvent(
-                                        "Function TAGame.CameraState_BallCam_TA.EndCameraState",
-                                        [&](std::string eventName) {
-                                                in_ball_cam = false;
-                                        });
                         } else {
                                 HookedEvents::RemoveHook(
                                         "Function Engine.GameViewportClient.Tick");
                                 HookedEvents::RemoveHook(
                                         "Function ProjectX.Camera_X.ClampPOV");
-                                HookedEvents::RemoveHook(
-                                        "Function TAGame.CameraState_BallCam_TA.BeginCameraState");
-                                HookedEvents::RemoveHook(
-                                        "Function TAGame.CameraState_BallCam_TA.EndCameraState");
                         }
                 });
 
@@ -81,8 +67,6 @@ void ReverseCameraPlugin::onUnload() {
  *
  * TODO: ADD HANDLING FOR DIFFERENT KEYBINDS
  *
- * THERES A BUG WITH THE X-AXIS! FUCK!
- *
  */
 void ReverseCameraPlugin::onTick(std::string eventName) {
         PlayerControllerWrapper pcw = gameWrapper->GetPlayerController();
@@ -93,11 +77,6 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                 if (pcw.GetbUsingGamepad()) {
                         // is right stick pressed?
                         //  if so = RearCam, otherwise Cleanup
-                        CarWrapper cw = gameWrapper->GetLocalCar();
-                        if (!cw.IsNull()) {
-                                is_on_wall = cw.IsOnWall();
-                        }
-
                         const bool stick_is_pressed = gameWrapper->IsKeyPressed(
                                 right_stick_fnameindex);
 
@@ -142,25 +121,6 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
         }
 }
 
-inline int ReverseCameraPlugin::fucking_fuckit(int num) const {
-        // all operations will fit inside a signed i32
-        const int RANGE_MAX = 16383;
-        const int RANGE_MIN = -16384;
-        if (num > RANGE_MAX) {
-                num += RANGE_MAX;
-                num %= abs(RANGE_MAX) + abs(RANGE_MIN);
-                return RANGE_MIN + num;
-        }
-
-        if (num < RANGE_MIN) {
-                num -= RANGE_MIN;
-                num  = (abs(num) % (abs(RANGE_MAX) + abs(RANGE_MIN)));
-                return RANGE_MAX - num;
-        }
-
-        return num;
-}
-
 void ReverseCameraPlugin::HandleValues() const {
         ServerWrapper server = gameWrapper->GetCurrentGameState();
         CameraWrapper cam    = gameWrapper->GetCamera();
@@ -168,66 +128,16 @@ void ReverseCameraPlugin::HandleValues() const {
                 return;
         }
 
+        /*
+        if you wish to account for camera angle,
+        you should get the CameraSettings and add Angle*180 to the pitch to
+        "zero" it out, or 2*Angle*180, to go in the opposite direction
+
+        ADD it, due to how the camera rotates around the
+        location. Adding to pitch moves it forward around the circle (or
+        sphere).
+        */
         if (enabled && in_reverse_cam) {
-                // cvarManager->executeCommand(
-                //         "bm_playground_camera_print_getters", false);
-                /*
-                 *
-                 *
-                 *
-                 *
-                 *  THE PROPBELM IS:::::::::::::::::::::::::::::::::::::
-                 * I NEED TO CALCULATE IT, THEN CALCULATE IT PAST THE POINT OF
-                 * INVALID RANGE [-32768,-16384]U[16384,32767] LIKE "FIX" THE
-                 * ROTATION VALUE BUT I CANT TOUCH THE FUCKING ROTATION I NEED
-                 * TO PRE-CALCULATE IT ON THE SWIVEL
-                 *
-                 * LIKE, WILL THE ROTATION + SWIVEL BE OUTSIDE OF THE RANGE? OR
-                 * LIKE, REVERSE ENGINEER "ROTATION POTENTIAL" FROM
-                 * GETDESIREDSWIVEL .... UGHHHHHHHHHHHHH
-                 *
-                 *
-                 *
-                 *
-                 *
-                 *
-                 *
-                 *
-                 *
-                 *
-                 */
-                /*
-Rotator rot = cam.GetDesiredSwivel(rsticky, rstickx);
-Rotator reverse_rot1 =
-cam.GetDesiredSwivel(CALCULATED_REVERSE_FACTOR * 1.0f,
-                     CALCULATED_REVERSE_FACTOR * 1.0f);
-Rotator reverse_rot2 =
-cam.GetDesiredSwivel(CALCULATED_REVERSE_FACTOR * -1.0f,
-                     CALCULATED_REVERSE_FACTOR * -1.0f);
-LOG("reverse_rot1: {{Pitch: {}, YAW: {}, Roll: {}}}",
-reverse_rot1.Pitch,
-reverse_rot1.Yaw,
-reverse_rot1.Roll);
-LOG("reverse_rot2: {{Pitch: {}, YAW: {}, Roll: {}}}",
-reverse_rot2.Pitch,
-reverse_rot2.Yaw,
-reverse_rot2.Roll);
-
-Rotator rtot =
-rot + Rotator{(is_on_wall) ? 32767 : 0, 32767, 0};
-LOG("rotot pitch: {}", rtot.Pitch);
-
-// the following shows a lack of fundamental understanding of
-// what the fuck is going on with the camera... because is it
-// actually the case that ball cam != regular cam??????? which
-// may actually BE the case but why would constricting it NOW.
-// MATTER this much to this extent.
-//                if (in_ball_cam) {
-// constrict the computed value...
-rtot.Pitch = fucking_fuckit(rtot.Pitch);
-//              }
-LOG("rotot pitch: {}", rtot.Pitch);
-                                        */
                 Rotator rot  = cam.GetDesiredSwivel(rsticky, rstickx);
                 Rotator rtot = rot + Rotator{32767, 0, 32767};
                 cam.SetCurrentSwivel(rtot);

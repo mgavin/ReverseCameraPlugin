@@ -11,12 +11,9 @@ class ReverseCameraPlugin :
         public BakkesMod::Plugin::PluginSettingsWindow {
 private:
         inline ServerWrapper GetCurrentGameState() const;
-        inline int           fucking_fuckit(int num) const;
 
         int   right_stick_fnameindex = 0;
         bool  in_reverse_cam         = false;
-        bool  in_ball_cam            = false;
-        bool  is_on_wall             = false;
         float rstickx = 0.0f, rsticky = 0.0f;
         bool  already_pressed = false;
         bool  enabled         = true;
