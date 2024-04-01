@@ -11,6 +11,7 @@ class ReverseCameraPlugin :
         public BakkesMod::Plugin::PluginSettingsWindow {
 private:
         inline ServerWrapper GetCurrentGameState() const;
+        inline int           fucking_fuckit(int num) const;
 
         int   right_stick_fnameindex = 0;
         bool  in_reverse_cam         = false;
@@ -19,8 +20,8 @@ private:
         bool  already_pressed = false;
         bool  enabled         = true;
 
-        const Rotator REVERSE_ROT_DELTA   = {16384, 32767, 0};
-        XINPUT_STATE  xboxControllerState = {0};
+        const float  CALCULATED_REVERSE_FACTOR = 1.456f;
+        XINPUT_STATE xboxControllerState       = {0};
 
 public:
         void onLoad() override;
