@@ -11,10 +11,10 @@ class HookedEvents {
 private:
         struct HookedEvent {
                 std::string eventName;
-                bool isPost;
+                bool        isPost;
 
                 HookedEvent(std::string eN, bool iP) :
-                        eventName(eN), isPost(iP) {}
+                        eventName(std::move(eN)), isPost(iP) {}
                 ~HookedEvent() {
                         LOG("{} unhooked", eventName);
                         isPost ? gameWrapper->UnhookEventPost(eventName) :
@@ -55,30 +55,30 @@ private:
                 hooked_events;
 
 public:
-        HookedEvents() = delete;
-        HookedEvents(HookedEvents &) = delete;
+        HookedEvents()                = delete;
+        HookedEvents(HookedEvents &)  = delete;
         HookedEvents(HookedEvents &&) = delete;
 
         static std::shared_ptr<GameWrapper> gameWrapper;
 
         template<typename T>
         static void AddHookedEventWithCaller(
-                const std::string & eventName,
-                std::function<void(T caller,
-                                   void * params,
+                const std::string &                        eventName,
+                std::function<void(T           caller,
+                                   void *      params,
                                    std::string eventName)> func,
-                bool isPost);
+                bool                                       isPost);
         static void AddHookedEvent(
-                const std::string & eventName,
+                const std::string &                        eventName,
                 std::function<void(std::string eventName)> func,
-                bool isPost = false);
+                bool                                       isPost = false);
         static void RemoveHook(std::string);
 };
 
 std::unordered_set<std::shared_ptr<HookedEvents::HookedEvent>,
                    HookedEvents::HookedEventHash,
                    HookedEvents::hook_cmp>
-        HookedEvents::hooked_events;
+                             HookedEvents::hooked_events;
 std::shared_ptr<GameWrapper> HookedEvents::gameWrapper;
 
 template<typename T>
@@ -86,12 +86,13 @@ void HookedEvents::AddHookedEventWithCaller(
         const std::string & eventName,
         std::function<void(T caller, void * params, std::string eventName)>
                 func,
-        bool isPost) {
+        bool    isPost) {
         if (gameWrapper == nullptr) {
                 throw std::exception{
                         "gameWrapper not set for hooking functions (put HookedEvents::gameWrapper = gameWrapper in your OnLoad() plugin member function)"};
         }
-        if (std::find_if(begin(hooked_events), end(hooked_events),
+        if (std::find_if(begin(hooked_events),
+                         end(hooked_events),
                          [eventName,
                           isPost](const std::shared_ptr<HookedEvent> & he) {
                                  return ((he->eventName == eventName) &&
@@ -115,14 +116,15 @@ void HookedEvents::AddHookedEventWithCaller(
 }
 
 void HookedEvents::AddHookedEvent(
-        const std::string & eventName,
+        const std::string &                        eventName,
         std::function<void(std::string eventName)> func,
-        bool isPost) {
+        bool                                       isPost) {
         if (gameWrapper == nullptr) {
                 throw std::exception{
                         "gameWrapper not set for hooking functions (put HookedEvents::gameWrapper = gameWrapper in your OnLoad() plugin member function)"};
         }
-        if (std::find_if(begin(hooked_events), end(hooked_events),
+        if (std::find_if(begin(hooked_events),
+                         end(hooked_events),
                          [eventName,
                           isPost](const std::shared_ptr<HookedEvent> & he) {
                                  return ((he->eventName == eventName) &&
@@ -135,7 +137,7 @@ void HookedEvents::AddHookedEvent(
         // just because it might exist before we manage it.
         HookedEvent::UnhookEvent(eventName, isPost);
         void (GameWrapper::*hook)(
-                std::string eventName,
+                std::string                                eventName,
                 std::function<void(std::string eventName)> callback) =
                 isPost ? &GameWrapper::HookEventPost : &GameWrapper::HookEvent;
         (gameWrapper.get()->*hook)(eventName, func);
@@ -147,7 +149,8 @@ void HookedEvents::AddHookedEvent(
 
 void HookedEvents::RemoveHook(std::string key) {
         auto it = std::find_if(
-                begin(hooked_events), end(hooked_events),
+                begin(hooked_events),
+                end(hooked_events),
                 [key](const auto & he) { return he->eventName == key; });
         if (it != end(hooked_events)) {
                 hooked_events.erase(it);

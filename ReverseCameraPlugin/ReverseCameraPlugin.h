@@ -10,8 +10,6 @@ class ReverseCameraPlugin :
         public BakkesMod::Plugin::BakkesModPlugin,
         public BakkesMod::Plugin::PluginSettingsWindow {
 private:
-        inline ServerWrapper GetCurrentGameState() const;
-
         int   right_stick_fnameindex = 0;
         bool  in_reverse_cam         = false;
         bool  invert_swivel          = false;

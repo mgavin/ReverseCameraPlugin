@@ -11,7 +11,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.2.8",
+                 "2.2.25",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -39,8 +39,27 @@ void ReverseCameraPlugin::onLoad() {
                 [this](std::string eventName) {
                         CameraWrapper cam = gameWrapper->GetCamera();
                         if (!cam.IsNull()) {
-                                angle_setting = std::fabs(
-                                        cam.GetCameraSettings().Pitch);
+                                gameWrapper->SetTimeout(
+                                        [this](GameWrapper * gw) {
+                                                // lord.
+                                                // because if you go too fast in
+                                                // the menu, it may get called
+                                                // at inappropriate times,
+                                                // objects may not get updated
+                                                // quickly enough.
+                                                // would be nice for a
+                                                // WAITFORMENU();
+                                                CameraWrapper cam =
+                                                        gw->GetCamera();
+                                                if (!cam.IsNull()) {
+                                                        angle_setting = std::fabs(
+                                                                cam.GetCameraSettings()
+                                                                        .Pitch);
+                                                }
+                                        },
+                                        // 10 milliseconds should be fine,
+                                        // right?
+                                        0.01f);
                         }
                 });
 
@@ -79,13 +98,6 @@ void ReverseCameraPlugin::onLoad() {
                 .addOnValueChanged(
                         [this](std::string oldValue, CVarWrapper newValue) {
                                 compensate_for_angle = newValue.getBoolValue();
-
-                                // INSURANCE
-                                CameraWrapper cam = gameWrapper->GetCamera();
-                                if (!cam.IsNull()) {
-                                        angle_setting = std::fabs(
-                                                cam.GetCameraSettings().Pitch);
-                                }
                         });
 
         /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT
@@ -98,7 +110,16 @@ void ReverseCameraPlugin::onLoad() {
                                 .InvertSwivelPitch;
         CameraWrapper cam = gameWrapper->GetCamera();
         if (!cam.IsNull()) {
-                angle_setting = std::fabs(cam.GetCameraSettings().Pitch);
+                gameWrapper->SetTimeout(
+                        [this](GameWrapper * gw) {
+                                // See earlier in the SetCameraAngle hook.
+                                CameraWrapper cam = gw->GetCamera();
+                                if (!cam.IsNull()) {
+                                        angle_setting = std::fabs(
+                                                cam.GetCameraSettings().Pitch);
+                                }
+                        },
+                        0.01f);
         }
 }
 
@@ -115,7 +136,7 @@ void ReverseCameraPlugin::onUnload() {
 void ReverseCameraPlugin::onTick(std::string eventName) {
         PlayerControllerWrapper pcw = gameWrapper->GetPlayerController();
         CameraWrapper           cam = gameWrapper->GetCamera();
-        ServerWrapper           sw  = GetCurrentGameState();
+        ServerWrapper           sw  = gameWrapper->GetCurrentGameState();
 
         if (!pcw.IsNull() && !cam.IsNull() && !sw.IsNull()) {
                 if (pcw.GetbUsingGamepad()) {
@@ -128,8 +149,12 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                                 cam.SetSwivelDieRate(0.0f);
                                 already_pressed = true;
                         } else if (!stick_is_pressed && already_pressed) {
-                                Rotator rot =
-                                        cam.GetDesiredSwivel(rsticky, rstickx);
+                                cam.SnapTransition();
+                                // this fixes the camera correcting its swivel
+                                // after releasing the button
+                                Rotator rot = cam.GetDesiredSwivel(
+                                        ((invert_swivel) ? 1 : -1) * rsticky,
+                                        rstickx);
                                 cam.SetCurrentSwivel(rot);
                                 cam.UpdateSwivel(0.0f);
                                 cam.SetSwivelDieRate(2.0f);
@@ -180,36 +205,11 @@ void ReverseCameraPlugin::HandleValues() const {
                         rtot += {180 * 2 * static_cast<int>(angle_setting),
                                  0,
                                  0};
-                        LOG("ANGLE SETTING: {}, CALCULATION: {}, PITCH START: {}, PITCH END {}",
-                            static_cast<int>(angle_setting),
-                            static_cast<int>(angle_setting) * 180 * 2,
-                            rtotc.Pitch,
-                            rtot.Pitch);
                 }
 
                 cam.SetCurrentSwivel(rtot);
-                cam.UpdateSwivel(0);
+                cam.UpdateSwivel(0.0f);
         }
-}
-
-// declared inline because
-// https://stackoverflow.com/questions/46163607/avoid-memory-allocation-with-stdfunction-and-member-function
-// led me to believe crashing with allocation errors was because of
-// ServerWrapper's instantiation with the memory_address so if it
-// happens inline instead, in the anonymous function / bound member
-// function, instead of being dynamically allocated and returned, it
-// would be in the function... something like that
-
-// which may or may not be the case because of fucking variables and stuff.
-// (I got paranoid because gw->LocalCar() may have been null at one point.
-// I'm not even entirely exactly sure what `inline` does.
-inline ServerWrapper ReverseCameraPlugin::GetCurrentGameState() const {
-        if (gameWrapper->IsInReplay())
-                return gameWrapper->GetGameEventAsReplay().memory_address;
-        else if (gameWrapper->IsInOnlineGame())
-                return gameWrapper->GetOnlineGame();
-        else
-                return gameWrapper->GetGameEventAsServer();
 }
 
 void ReverseCameraPlugin::RenderSettings() {
