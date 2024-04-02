@@ -15,9 +15,11 @@ private:
         int   right_stick_fnameindex = 0;
         bool  in_reverse_cam         = false;
         bool  invert_swivel          = false;
+        float angle_setting          = 0.0;
         float rstickx = 0.0f, rsticky = 0.0f;
-        bool  already_pressed = false;
-        bool  enabled         = true;
+        bool  already_pressed      = false;
+        bool  enabled              = true;
+        bool  compensate_for_angle = false;
 
         const float  CALCULATED_REVERSE_FACTOR = 1.456f;
         XINPUT_STATE xboxControllerState       = {0};

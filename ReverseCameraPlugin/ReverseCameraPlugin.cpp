@@ -11,7 +11,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.1.35",
+                 "2.2.8",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -25,6 +25,24 @@ void LOG(const S & format_str, Args &&... args) {
 void ReverseCameraPlugin::onLoad() {
         _globalCVarManager        = cvarManager;
         HookedEvents::gameWrapper = gameWrapper;
+
+        HookedEvents::AddHookedEvent(
+                "Function TAGame.GFxData_Settings_TA.SetInvertSwivelPitch",
+                [this](std::string eventName) {
+                        invert_swivel = !(gameWrapper->GetSettings()
+                                                  .GetCameraSaveSettings()
+                                                  .InvertSwivelPitch);
+                });
+
+        HookedEvents::AddHookedEvent(
+                "Function TAGame.GFxData_Settings_TA.SetCameraAngle",
+                [this](std::string eventName) {
+                        CameraWrapper cam = gameWrapper->GetCamera();
+                        if (!cam.IsNull()) {
+                                angle_setting = std::fabs(
+                                        cam.GetCameraSettings().Pitch);
+                        }
+                });
 
         cvarManager
                 ->registerCvar(
@@ -45,16 +63,6 @@ void ReverseCameraPlugin::onLoad() {
                                         std::bind(&ReverseCameraPlugin::
                                                           HandleValues,
                                                   this));
-                                HookedEvents::AddHookedEvent(
-                                        "Function TAGame.GFxData_Settings_TA.SetInvertSwivelPitch",
-                                        [this](std::string eventName) {
-                                                // set = 0 in the settings
-                                                invert_swivel = !(
-                                                        gameWrapper
-                                                                ->GetSettings()
-                                                                .GetCameraSaveSettings()
-                                                                .InvertSwivelPitch);
-                                        });
                         } else {
                                 HookedEvents::RemoveHook(
                                         "Function Engine.GameViewportClient.Tick");
@@ -63,15 +71,35 @@ void ReverseCameraPlugin::onLoad() {
                         }
                 });
 
-        /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT KEYBINDS? */
+        cvarManager
+                ->registerCvar(
+                        "ReverseCamera_Cam_Angle_Compensate",
+                        std::to_string(false),
+                        "Flag for plugin to compensate the pitch for camera's angle")
+                .addOnValueChanged(
+                        [this](std::string oldValue, CVarWrapper newValue) {
+                                compensate_for_angle = newValue.getBoolValue();
+
+                                // INSURANCE
+                                CameraWrapper cam = gameWrapper->GetCamera();
+                                if (!cam.IsNull()) {
+                                        angle_setting = std::fabs(
+                                                cam.GetCameraSettings().Pitch);
+                                }
+                        });
+
+        /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT
+         * KEYBINDS? */
         right_stick_fnameindex =
                 gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
 
-        // unset = 1 in the settings, like, "inverting swivel" is default, so 1
-        // means do opposite / unswivel / negate the swivel.
-        invert_swivel = !(gameWrapper->GetSettings()
-                                  .GetCameraSaveSettings()
-                                  .InvertSwivelPitch);
+        invert_swivel = gameWrapper->GetSettings()
+                                .GetCameraSaveSettings()
+                                .InvertSwivelPitch;
+        CameraWrapper cam = gameWrapper->GetCamera();
+        if (!cam.IsNull()) {
+                angle_setting = std::fabs(cam.GetCameraSettings().Pitch);
+        }
 }
 
 void ReverseCameraPlugin::onUnload() {
@@ -143,20 +171,22 @@ void ReverseCameraPlugin::HandleValues() const {
                 return;
         }
 
-        /*
-        if you wish to account for camera angle,
-        you should get the CameraSettings and add Angle*180 to the pitch
-        to "zero" it out, or 2*Angle*180, to go in the opposite
-        direction
-
-        ADD it, due to how the camera rotates around the
-        location. Adding to pitch moves it forward around the circle (or
-        sphere).
-        */
         if (enabled && in_reverse_cam) {
                 Rotator rot = cam.GetDesiredSwivel(
                         ((invert_swivel) ? -1 : 1) * rsticky, rstickx);
-                Rotator rtot = rot + Rotator{32767, 0, 32767};
+                Rotator rtot  = rot + Rotator{32767, 0, 32767};
+                Rotator rtotc = rtot;
+                if (compensate_for_angle) {
+                        rtot += {180 * 2 * static_cast<int>(angle_setting),
+                                 0,
+                                 0};
+                        LOG("ANGLE SETTING: {}, CALCULATION: {}, PITCH START: {}, PITCH END {}",
+                            static_cast<int>(angle_setting),
+                            static_cast<int>(angle_setting) * 180 * 2,
+                            rtotc.Pitch,
+                            rtot.Pitch);
+                }
+
                 cam.SetCurrentSwivel(rtot);
                 cam.UpdateSwivel(0);
         }
@@ -189,6 +219,14 @@ void ReverseCameraPlugin::RenderSettings() {
         bool enable = enabled_cvar.getBoolValue();
         if (ImGui::Checkbox("ENABLE?????????????", &enable)) {
                 enabled_cvar.setValue(enable);
+        }
+
+        CVarWrapper compensate_cvar =
+                cvarManager->getCvar("ReverseCamera_Cam_Angle_Compensate");
+        bool compensate = compensate_cvar.getBoolValue();
+        if (ImGui::Checkbox("Compensate pitch for camera angle?",
+                            &compensate)) {
+                compensate_cvar.setValue(compensate);
         }
         ImGui::NewLine();
         ImGui::Separator();
