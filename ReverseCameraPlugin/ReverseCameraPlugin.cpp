@@ -12,7 +12,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 BAKKESMOD_PLUGIN(
         ReverseCameraPlugin,
         "ReverseCameraPlugin",
-        "2.3.16",
+        "2.4.16",
         /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -229,13 +229,13 @@ void ReverseCameraPlugin::RenderSettings() {
         static const char * keyText  = "Key List";
         static const char * hintText = "Type to Filter";
 
-        ImGui::TextUnformatted("Press the Set Keybind button below to bind command ReverseCamera_Keybind to a key:");
+        ImGui::TextUnformatted(
+                "Press the Set Keybind button below to bind the key that activates reversing the camera:");
         if (ImGui::SearchableCombo("##keybind combo", &keyIndex, keys, keyText, hintText, 20))
                 OnBind(keys[keyIndex]);
 
         ImGui::SameLine();
         if (ImGui::ButtonEx("Set Keybind", ImVec2(0, 0), ImGuiButtonFlags_AlignTextBaseLine)) {
-                should_block_until_keybound = true;
                 gameWrapper->Execute([this](GameWrapper * gw) {
                         cvarManager->executeCommand("closemenu settings; openmenu reversecamerabind");
                         HookedEvents::AddHookedEventWithCaller<ActorWrapper>(
@@ -259,7 +259,16 @@ void ReverseCameraPlugin::RenderSettings() {
                 }
         }
 
-        ImGui::TextUnformatted("Bind a key to associate with reversing the camera. Fucking clean this up later.");
+        ImGui::TextUnformatted("NOTES:");
+        ImGui::NewLine();
+        ImGui::TextUnformatted("REAR CAM IS A MUTUALLY EXCLUSIVE OPERATION TO REVERSE CAMERA");
+        ImGui::NewLine();
+        ImGui::TextUnformatted("DO NOT ASSIGN IT TO THE SAME KEY");
+        ImGui::Separator();
+        ImGui::TextUnformatted("IF \"[SET KEYBIND]\" FLASHES AND DOESN'T GIVE YOU A CHANCE TO PRESS A KEY ");
+        ImGui::NewLine();
+        ImGui::TextUnformatted(
+                "TRY CLEARING ANY INPUTS BEING HELD DOWN (Left/right click on main menu holding camera, etc)");
         ImGui::Separator();
         ImGui::SetCursorPosY(ImGui::GetWindowSize().y - 65);
         // ImGui::Image(logo->GetImGuiTex(), {logo->GetSizeF().X, logo->GetSizeF().Y});
@@ -278,30 +287,33 @@ std::string ReverseCameraPlugin::GetPluginName() {
 }
 
 void ReverseCameraPlugin::Render() {
-        // creating a translucent background that refuses inputs
+        // creating a translucent background
         ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
         ImGui::SetNextWindowSize(ImVec2(ImGui::GetIO().DisplaySize.x, ImGui::GetIO().DisplaySize.y));
-        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(30.f, 30.0f, 30.0f, 0.1f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(30.f, 30.0f, 30.0f, 0.2f));
         ImGui::Begin(
                 "translucent_background",
                 &isWindowOpen,
-                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoMove |
-                        ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
-                        ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus |
-                        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration |
-                        ImGuiWindowFlags_NoFocusOnAppearing);
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize
+                        | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus
+                        | ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDecoration
+                        | ImGuiWindowFlags_NoFocusOnAppearing);
+        ImGui::FocusableItemUnregister(ImGui::GetCurrentWindow());
         ImGui::PopStyleColor();
         ImGui::SetNextWindowPos(ImGui::GetIO().DisplaySize * 0.5f, ImGuiCond_Always, ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(140, 40));
         ImGui::SetNextWindowFocus();
-        ImGui::Begin(
+
+        // do your best to capture inputs
+        ImGui::BeginChild(
                 "Set Keybind",
-                &isWindowOpen,
-                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                        ImGuiWindowFlags_NoSavedSettings);
+                ImVec2(140, 40),
+                true,
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove
+                        | ImGuiWindowFlags_NoSavedSettings);
         ImGui::SetWindowFontScale(1.6f);
         ImGui::TextUnformatted("Press any key");
-        ImGui::End();
+        ImGui::SetKeyboardFocusHere();
+        ImGui::EndChild();
         ImGui::End();
 }
 
@@ -324,12 +336,8 @@ void ReverseCameraPlugin::OnKeyPressed(ActorWrapper aw, void * params, std::stri
         keyIndex = ((keysIt = find(keys.begin(), keys.end(), key)) != keys.end()) ? (int)(keysIt - keys.begin()) : -1;
         cvarManager->executeCommand("closemenu reversecamerabind; openmenu settings");
         HookedEvents::RemoveHook("Function TAGame.GameViewportClient_TA.HandleKeyPress");
-        should_block_until_keybound = false;
-        //
-        // OnBind(keys[keyIndex]); // wait, what the fuck.it crashed when I used my controller.
-        // AND PRESSED THE A BUTTON ?
 
-        // maybe this will help the "set timeout" grabbing of the angle setting :/
+        // this is because of mem-access issues
         gameWrapper->Execute([this](GameWrapper * gw) { OnBind(keys[keyIndex]); });
 }
 
@@ -351,11 +359,6 @@ std::string ReverseCameraPlugin::GetMenuTitle() {
 
 bool ReverseCameraPlugin::ShouldBlockInput() {
         return false;
-        if (should_block_until_keybound) {
-                return true;
-        } else {
-                return false;
-        }
 }
 
 bool ReverseCameraPlugin::IsActiveOverlay() {

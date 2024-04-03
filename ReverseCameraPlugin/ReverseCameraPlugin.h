@@ -18,10 +18,9 @@ class ReverseCameraPlugin :
 private:
         // https://raw.githubusercontent.com/esnar11/SkipReplay/master/source/SkipReplay.h
         std::string                    keybind;
-        bool                           should_block_until_keybound = false;
-        bool                           isWindowOpen                = false;
-        bool                           isMinimized                 = false;
-        int                            keyIndex                    = 0;
+        bool                           isWindowOpen = false;
+        bool                           isMinimized  = false;
+        int                            keyIndex     = 0;
         std::unique_ptr<CVarWrapper>   keybindCvar;
         const std::vector<std::string> keys = {
                 "F1",
