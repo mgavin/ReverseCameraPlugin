@@ -10,6 +10,8 @@ class ReverseCameraPlugin :
         public BakkesMod::Plugin::BakkesModPlugin,
         public BakkesMod::Plugin::PluginSettingsWindow {
 private:
+        bool in_goal_replay = false;
+
         int   right_stick_fnameindex = 0;
         bool  in_reverse_cam         = false;
         bool  invert_swivel          = false;

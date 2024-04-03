@@ -11,7 +11,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.2.25",
+                 "2.3.01",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -25,6 +25,28 @@ void LOG(const S & format_str, Args &&... args) {
 void ReverseCameraPlugin::onLoad() {
         _globalCVarManager        = cvarManager;
         HookedEvents::gameWrapper = gameWrapper;
+
+        HookedEvents::AddHookedEvent(
+                "Function GameEvent_Soccar_TA.ReplayPlayback.ShouldPlayReplay",
+                [this](std::string eventName) {
+                        in_goal_replay = true;
+
+                        CameraWrapper cam = gameWrapper->GetCamera();
+                        if (!cam.IsNull()) {
+                                cam.SetbEnableFading(1);
+                        }
+                });
+
+        HookedEvents::AddHookedEvent(
+                "Function TAGame.GameEvent_Soccar_TA.EventReplayFinished",
+                [this](std::string eventName) {
+                        in_goal_replay = false;
+
+                        CameraWrapper cam = gameWrapper->GetCamera();
+                        if (!cam.IsNull()) {
+                                cam.SetbEnableFading(1);
+                        }
+                });
 
         HookedEvents::AddHookedEvent(
                 "Function TAGame.GFxData_Settings_TA.SetInvertSwivelPitch",
@@ -149,11 +171,16 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
                                 cam.SetSwivelDieRate(0.0f);
                                 already_pressed = true;
                         } else if (!stick_is_pressed && already_pressed) {
-                                cam.SnapTransition();
+                                if (in_goal_replay) {
+                                        cam.SetbEnableFading(0);
+                                }
                                 // this fixes the camera correcting its swivel
                                 // after releasing the button
                                 Rotator rot = cam.GetDesiredSwivel(
-                                        ((invert_swivel) ? 1 : -1) * rsticky,
+                                        ((invert_swivel && !in_goal_replay) ?
+                                                 1 :
+                                                 -1) *
+                                                rsticky,
                                         rstickx);
                                 cam.SetCurrentSwivel(rot);
                                 cam.UpdateSwivel(0.0f);
@@ -205,6 +232,10 @@ void ReverseCameraPlugin::HandleValues() const {
                         rtot += {180 * 2 * static_cast<int>(angle_setting),
                                  0,
                                  0};
+                }
+                if (in_goal_replay) {
+                        const int MAGIC_REPLAY_ANGLE = 15;
+                        rtot += {180 * 2 * MAGIC_REPLAY_ANGLE, 0, 0};
                 }
 
                 cam.SetCurrentSwivel(rtot);
