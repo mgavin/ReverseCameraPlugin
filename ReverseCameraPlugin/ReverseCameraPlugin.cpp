@@ -11,7 +11,7 @@ std::shared_ptr<CVarManagerWrapper> _globalCVarManager;
 
 BAKKESMOD_PLUGIN(ReverseCameraPlugin,
                  "ReverseCameraPlugin",
-                 "2.3.01",
+                 "2.3.4",
                  /*UNUSED*/ NULL);
 
 template<typename S, typename... Args>
@@ -27,7 +27,7 @@ void ReverseCameraPlugin::onLoad() {
         HookedEvents::gameWrapper = gameWrapper;
 
         HookedEvents::AddHookedEvent(
-                "Function GameEvent_Soccar_TA.ReplayPlayback.ShouldPlayReplay",
+                "Function ReplayDirector_TA.Playing.BeginState",
                 [this](std::string eventName) {
                         in_goal_replay = true;
 
@@ -38,7 +38,7 @@ void ReverseCameraPlugin::onLoad() {
                 });
 
         HookedEvents::AddHookedEvent(
-                "Function TAGame.GameEvent_Soccar_TA.EventReplayFinished",
+                "Function ReplayDirector_TA.Playing.EndState",
                 [this](std::string eventName) {
                         in_goal_replay = false;
 
