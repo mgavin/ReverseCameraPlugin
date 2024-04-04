@@ -1,7 +1,6 @@
 #pragma once
 #include <Windows.h>
 #include <Xinput.h>
-#include <string>
 #include "bakkesmod/imgui/imgui.h"
 #include "bakkesmod/imgui/imgui_internal.h"
 #include "bakkesmod/imgui/imgui_searchablecombo.h"
@@ -9,8 +8,6 @@
 #include "bakkesmod/plugin/PluginSettingsWindow.h"
 #include "bakkesmod/plugin/pluginwindow.h"
 
-using std::string;
-using std::vector;
 class ReverseCameraPlugin :
         public BakkesMod::Plugin::BakkesModPlugin,
         public BakkesMod::Plugin::PluginSettingsWindow,
@@ -66,16 +63,16 @@ private:
                 "Tilde",
                 "ScrollLock",
                 "Pause",
-                "one",
-                "two",
-                "three",
-                "four",
-                "five",
-                "six",
-                "seven",
-                "eight",
-                "nine",
-                "zero",
+                "One",
+                "Two",
+                "Three",
+                "Four",
+                "Five",
+                "Six",
+                "Seven",
+                "Eight",
+                "Nine",
+                "Zero",
                 "Underscore",
                 "Equals",
                 "Backslash",
