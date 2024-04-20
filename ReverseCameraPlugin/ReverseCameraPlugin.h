@@ -1,4 +1,5 @@
 #pragma once
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <Xinput.h>
 #include "bakkesmod/imgui/imgui.h"
@@ -175,6 +176,7 @@ private:
         bool  already_pressed      = false;
         bool  enabled              = true;
         bool  compensate_for_angle = false;
+        bool  set_key_popup_lock   = false;
 
         const float  CALCULATED_REVERSE_FACTOR = 1.456f;
         XINPUT_STATE xboxControllerState       = {0};
