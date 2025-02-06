@@ -25,13 +25,6 @@ void ReverseCameraPlugin::onLoad() {
       _globalCVarManager        = cvarManager;
       HookedEvents::gameWrapper = gameWrapper;
 
-      /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT
-       * KEYBINDS? */
-      right_stick_fnameindex = gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
-
-      // putting this before maybe needing it in one of these cvar initializations
-      invert_swivel_setting = gameWrapper->GetSettings().GetCameraSaveSettings().InvertSwivelPitch;
-
       HookedEvents::AddHookedEvent("Function ReplayDirector_TA.Playing.BeginState", [this](std::string eventName) {
             in_goal_replay = true;
 
@@ -53,7 +46,9 @@ void ReverseCameraPlugin::onLoad() {
       HookedEvents::AddHookedEvent(
             "Function TAGame.GFxData_Settings_TA.SetInvertSwivelPitch",
             [this](std::string eventName) {
-                  invert_swivel_setting = (gameWrapper->GetSettings().GetCameraSaveSettings().InvertSwivelPitch);
+                  // this gets called before the setting actually gets set in the gameWrapper,
+                  // so we take the opposite to get the true setting of this boolean value
+                  invert_swivel_setting = !(gameWrapper->GetSettings().GetCameraSaveSettings().InvertSwivelPitch);
                   CVarWrapper invert_set_swivel_cvar = cvarManager->getCvar("ReverseCamera_Cam_Swivel_Invert");
                   invert_swivel
                         = (invert_set_swivel_cvar.getBoolValue()) ? !invert_swivel_setting : invert_swivel_setting;
@@ -124,6 +119,11 @@ void ReverseCameraPlugin::onLoad() {
             .addOnValueChanged([this](std::string oldValue, CVarWrapper newValue) {
                   invert_swivel = (newValue.getBoolValue()) ? !invert_swivel_setting : invert_swivel_setting;
             });
+
+      /* TODOOOOOOOOOOOOOOOOOOO: HANDLING DIFFERENT
+       * KEYBINDS? */
+      right_stick_fnameindex = gameWrapper->GetFNameIndexByString("XboxTypeS_RightThumbStick");
+      invert_swivel_setting  = gameWrapper->GetSettings().GetCameraSaveSettings().InvertSwivelPitch;
 }
 
 void ReverseCameraPlugin::onUnload() {
@@ -166,8 +166,9 @@ void ReverseCameraPlugin::onTick(std::string eventName) {
 
                         // this fixes the camera correcting its swivel
                         // after releasing the button
+                        // SINCE THE YAW ROTATES AROUND THE CAR, INVERT_SWIVEL IS OPPOSITE
                         Rotator rot = cam.GetDesiredSwivel(
-                              ((invert_swivel_setting && !in_goal_replay) ? -1 : 1) * rsticky,
+                              ((invert_swivel_setting && !in_goal_replay) ? 1 : -1) * rsticky,
                               rstickx);
 
                         cam.SetCurrentSwivel(rot);
@@ -207,26 +208,13 @@ void ReverseCameraPlugin::HandleValues() const {
       }
 
       if (enabled && in_reverse_cam) {
-            Rotator rot   = cam.GetDesiredSwivel((invert_swivel ? -1 : 1) * rsticky, rstickx);
-            // LOG("rot: {{Pitch: {}, Yaw: {}, Roll: {}}}, stick: {{x: {}, y: {}}}",
-            //     rot.Pitch,
-            //     rot.Yaw,
-            //     rot.Roll,
-            //     rstickx,
-            //     rsticky);
-            //  Rotator rtot  = rot + Rotator {32767, 0, 32767};
-            //  Rotator rot   = Rotator {};
+            // SINCE THE YAW ROTATES AROUND THE CAR, INVERT_SWIVEL IS OPPOSITE
+            Rotator rot   = cam.GetDesiredSwivel((invert_swivel ? 1 : -1) * rsticky, rstickx);
             Rotator rtot  = rot + Rotator {0, 32767, 0};
             Rotator rtotc = rtot;
             if (negate_cam_angle) {
                   rtot += {180 * 2 * static_cast<int>(angle_setting), 0, 0};
             }
-            // if (in_goal_replay) {
-            //       // during a goal replay, it seems your camera is put in the middle of the map at a pitch angle
-            //       // ... that pitch angle different seems to be -15 ... this compensates for that
-            //       const int MAGIC_REPLAY_ANGLE  = 15;
-            //       rtot                         += {180 * 2 * MAGIC_REPLAY_ANGLE, 0, 0};
-            // }
 
             cam.SetCurrentSwivel(rtot);
             cam.UpdateSwivel(0.0f);
